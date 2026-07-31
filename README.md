@@ -26,8 +26,8 @@
 | 2  | **User**      | Get profile, Update profile (PATCH), Change password                   | ✅         |
 | 3  | **Workspace** | CRUD workspace, Invite/Remove member, Phân quyền theo role             | ✅         |
 | 4  | **Project**   | CRUD trong workspace, Archive project                                  | ✅         |
-| 5  | Task          | CRUD trong project, Assign, Chuyển status, Priority & due_date         | 🔲         |
-| 6  | Label         | CRUD per project, Gán/bỏ label cho task                                | 🔲         |
+| 5  | Task          | CRUD trong project, Assign, Chuyển status, Priority & due_date         | ✅         |
+| 6  | Label         | CRUD per project, Gán/bỏ label cho task                                | ✅         |
 | 7  | Comment       | Thêm/xóa comment trên task                                            | 🔲         |
 | 8  | Filter & Page | Lọc task theo status, priority, assignee; pagination                   | 🔲         |
 | 9  | Caching       | Cache GET tasks với Redis, invalidate khi có thay đổi                  | 🔲         |
@@ -69,13 +69,17 @@ TaskHub/
 │   │   ├── __init__.py            # Export all models
 │   │   ├── user.py                # User model (ADMIN/MEMBER)
 │   │   ├── workspace.py           # Workspace + WorkspaceMember models
-│   │   └── project.py             # Project model (ACTIVE/ARCHIVED)
+│   │   ├── project.py             # Project model (ACTIVE/ARCHIVED)
+│   │   ├── label.py               # Label model
+│   │   └── task.py                # Task model + task_labels
 │   ├── schemas/
 │   │   ├── __init__.py            # Export all schemas
 │   │   ├── auth.py                # Token, LoginRequest, RefreshTokenRequest
 │   │   ├── user.py                # UserCreate, UserUpdate, UserResponse
 │   │   ├── workspace.py           # WorkspaceCreate/Update/Response, MemberAdd
-│   │   └── project.py             # ProjectCreate, ProjectUpdate, ProjectResponse
+│   │   ├── project.py             # ProjectCreate, ProjectUpdate, ProjectResponse
+│   │   ├── label.py               # LabelCreate, LabelUpdate, LabelResponse
+│   │   └── task.py                # TaskCreate, TaskUpdate, TaskResponse
 │   └── api/
 │       └── v1/
 │           ├── router.py          # API router aggregation
@@ -84,7 +88,9 @@ TaskHub/
 │               ├── auth.py        # Register, Login, Refresh, Logout
 │               ├── users.py       # Profile, Update, Change password
 │               ├── workspaces.py  # Workspace CRUD + Member management
-│               └── projects.py    # Project CRUD + Archive
+│               ├── projects.py    # Project CRUD + Archive
+│               ├── labels.py      # Label CRUD
+│               └── tasks.py       # Task CRUD + Filter + Labels
 ├── alembic/                       # Database migrations
 ├── alembic.ini
 ├── docker-compose.yml             # PostgreSQL 16 + Redis 7 + App
@@ -94,7 +100,8 @@ TaskHub/
 ├── conftest.py                    # Pytest config (async event loop)
 ├── pytest.ini
 ├── test_auth_user.py              # Auth & User integration tests
-└── test_workspace_project.py      # Workspace & Project integration tests
+├── test_workspace_project.py      # Workspace & Project integration tests
+└── test_task_label.py             # Task & Label integration tests
 ```
 
 ---
@@ -214,6 +221,27 @@ REDIS_URL=redis://localhost:6379/0
 | PATCH  | `/projects/{id}`                      | Cập nhật / Archive project | OWNER / EDITOR |
 | DELETE | `/projects/{id}`                      | Xóa project              | OWNER          |
 
+### Label (`/api/v1`)
+
+| Method | Endpoint                      | Mô tả                      | Quyền          |
+|--------|-------------------------------|-----------------------------|----------------|
+| POST   | `/projects/{id}/labels`       | Tạo label trong project     | OWNER / EDITOR |
+| GET    | `/projects/{id}/labels`       | Danh sách label trong project| Member        |
+| PATCH  | `/labels/{id}`                | Cập nhật label              | OWNER / EDITOR |
+| DELETE | `/labels/{id}`                | Xóa label                   | OWNER / EDITOR |
+
+### Task (`/api/v1`)
+
+| Method | Endpoint                              | Mô tả                                       | Quyền          |
+|--------|---------------------------------------|----------------------------------------------|----------------|
+| POST   | `/projects/{id}/tasks`                | Tạo task trong project                       | OWNER / EDITOR |
+| GET    | `/projects/{id}/tasks`                | Danh sách task (lọc status/priority/assignee)| Member         |
+| GET    | `/tasks/{id}`                         | Chi tiết task                                | Member         |
+| PATCH  | `/tasks/{id}`                         | Cập nhật task (status/priority/assignee/...) | OWNER / EDITOR |
+| DELETE | `/tasks/{id}`                         | Xóa task                                     | OWNER / EDITOR |
+| POST   | `/tasks/{id}/labels/{label_id}`       | Gán label cho task                           | OWNER / EDITOR |
+| DELETE | `/tasks/{id}/labels/{label_id}`       | Bỏ label khỏi task                           | OWNER / EDITOR |
+
 ---
 
 ## 🛡 Phân quyền (RBAC)
@@ -275,7 +303,34 @@ REDIS_URL=redis://localhost:6379/0
                           │   │ description              │
                           │   │ status (ACTIVE/ARCHIVED) │
                           │   │ created_at               │
-                          │   └──────────────────────────┘
+                          │   └──────────┬───────────────┘
+                                         │
+                        ┌────────────────┴────────────────┐
+                        │ 1:N                             │ 1:N
+                        ▼                                 ▼
+         ┌──────────────────────────┐      ┌──────────────────────────┐
+         │          tasks           │      │          labels          │
+         ├──────────────────────────┤      ├──────────────────────────┤
+         │ id (PK)                  │      │ id (PK)                  │
+         │ project_id (FK)          │      │ project_id (FK)          │
+         │ assignee_id (FK → users) │      │ name                     │
+         │ title                    │      │ color                    │
+         │ description              │      └────────────┬─────────────┘
+         │ status (TODO/IN_PROGRESS)│                   │
+         │ priority (LOW/URGENT...) │                   │
+         │ due_date                 │                   │
+         │ created_by (FK → users)  │                   │
+         │ created_at               │                   │
+         └──────────────┬───────────┘                   │
+                        │                               │
+                        └───────────────┬───────────────┘
+                                        ▼ N:M
+                         ┌─────────────────────────────┐
+                         │         task_labels         │
+                         ├─────────────────────────────┤
+                         │ task_id (PK, FK)            │
+                         │ label_id (PK, FK)           │
+                         └─────────────────────────────┘
 ```
 
 ---
@@ -294,6 +349,7 @@ python -m pytest -v
 # Chạy từng file
 python -m pytest test_auth_user.py -v
 python -m pytest test_workspace_project.py -v
+python -m pytest test_task_label.py -v
 ```
 
 ### Test Suites hiện có
@@ -302,6 +358,7 @@ python -m pytest test_workspace_project.py -v
 |-------------------------------|-----------------------------------------------|:---------:|
 | `test_auth_user.py`          | Register → Login → Profile → Update → Logout | 7         |
 | `test_workspace_project.py`  | Workspace CRUD, Member mgmt, Project CRUD     | 10        |
+| `test_task_label.py`         | Task & Label CRUD, Assignee, Filter, RBAC     | 15        |
 
 ---
 

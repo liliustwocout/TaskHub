@@ -22,3 +22,6 @@ class Project(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
 
     workspace: Mapped["Workspace"] = relationship("Workspace", back_populates="projects")
+    tasks: Mapped[list["Task"]] = relationship("Task", back_populates="project", cascade="all, delete-orphan")
+    labels: Mapped[list["Label"]] = relationship("Label", back_populates="project", cascade="all, delete-orphan")
+

@@ -335,6 +335,166 @@ Chuyển sang token **Owner**:
 
 ---
 
+## Feature 5 — Task & Feature 6 — Label
+
+> [!NOTE]
+> Điều kiện tiền đề: Sử dụng Workspace `id = 1` và Project `id = 2` (hoặc project `id` từ các bước trước).
+> Cần có 3 role: **Owner** (owner@test.com), **Editor** (member@test.com - role EDITOR), và **Viewer** (viewer@test.com - role VIEWER).
+
+### Test 6.1: Tạo Label trong Project (OWNER / EDITOR) ✅
+
+**POST `/api/v1/projects/{project_id}/labels`** → `project_id = 2`:
+
+```json
+{
+  "name": "Backend",
+  "color": "#FF0000"
+}
+```
+
+→ Kỳ vọng: `201 Created`
+```json
+{
+  "id": 1,
+  "project_id": 2,
+  "name": "Backend",
+  "color": "#FF0000"
+}
+```
+
+---
+
+### Test 6.2: Xem danh sách Label trong Project ✅
+
+**GET `/api/v1/projects/{project_id}/labels`** → `project_id = 2`
+
+→ Kỳ vọng: `200 OK`, mảng chứa các label của project.
+
+---
+
+### Test 6.3: Cập nhật Label ✅
+
+**PATCH `/api/v1/labels/{label_id}`** → `label_id = 1`:
+
+```json
+{
+  "name": "Core Backend",
+  "color": "#00FF00"
+}
+```
+
+→ Kỳ vọng: `200 OK`, `name` đổi thành `"Core Backend"`.
+
+---
+
+### Test 5.1: Tạo Task trong Project (EDITOR) ✅
+
+Dùng token **Member** (role EDITOR):
+
+**POST `/api/v1/projects/{project_id}/tasks`** → `project_id = 2`:
+
+```json
+{
+  "title": "Xây dựng Module Auth",
+  "description": "Cần hoàn thiện endpoint register, login, refresh token",
+  "assignee_id": 2,
+  "status": "TODO",
+  "priority": "HIGH"
+}
+```
+
+→ Kỳ vọng: `201 Created`
+```json
+{
+  "id": 1,
+  "project_id": 2,
+  "assignee_id": 2,
+  "title": "Xây dựng Module Auth",
+  "description": "Cần hoàn thiện endpoint register, login, refresh token",
+  "status": "TODO",
+  "priority": "HIGH",
+  "due_date": null,
+  "created_by": 2,
+  "created_at": "...",
+  "labels": []
+}
+```
+
+---
+
+### Test 5.2: Gán Label cho Task ✅
+
+**POST `/api/v1/tasks/{task_id}/labels/{label_id}`** → `task_id = 1`, `label_id = 1`
+
+→ Kỳ vọng: `200 OK`, mảng `labels` trong task có chứa label `Core Backend`.
+
+---
+
+### Test 5.3: Lọc Task theo Status, Priority và Assignee ✅
+
+**GET `/api/v1/projects/{project_id}/tasks?status=TODO&priority=HIGH&page=1&limit=10`**
+
+→ Kỳ vọng: `200 OK`, danh sách task thỏa mãn điều kiện lọc.
+
+---
+
+### Test 5.4: Cập nhật Task (Chuyển Status & Priority) ✅
+
+**PATCH `/api/v1/tasks/{task_id}`** → `task_id = 1`:
+
+```json
+{
+  "status": "IN_PROGRESS",
+  "priority": "URGENT"
+}
+```
+
+→ Kỳ vọng: `200 OK`, `status = "IN_PROGRESS"`, `priority = "URGENT"`.
+
+---
+
+### Test 5.5: VIEWER không tạo được Task / Label ❌
+
+Chuyển sang token **Viewer**:
+
+**POST `/api/v1/projects/2/tasks`**:
+
+```json
+{
+  "title": "Viewer task should fail"
+}
+```
+
+→ Kỳ vọng: `403 Forbidden` — *"Only OWNER or EDITOR can create tasks in this project"*.
+
+---
+
+### Test 5.6: Bỏ Label khỏi Task ✅
+
+Chuyển token **Editor**:
+
+**DELETE `/api/v1/tasks/{task_id}/labels/{label_id}`** → `task_id = 1`, `label_id = 1`
+
+→ Kỳ vọng: `204 No Content`.
+
+---
+
+### Test 5.7: Xóa Task ✅
+
+**DELETE `/api/v1/tasks/{task_id}`** → `task_id = 1`
+
+→ Kỳ vọng: `204 No Content`.
+
+---
+
+### Test 6.4: Xóa Label ✅
+
+**DELETE `/api/v1/labels/{label_id}`** → `label_id = 1`
+
+→ Kỳ vọng: `204 No Content`.
+
+---
+
 ## Tóm tắt Ma trận Test
 
 | # | Test Case                              | User  | Kỳ vọng          |
@@ -357,3 +517,15 @@ Chuyển sang token **Owner**:
 | 16| Editor xóa project                     | Member| `403 Forbidden`   |
 | 17| Owner xóa project                      | Owner | `204 No Content`  |
 | 18| Viewer tạo project                     | Member| `403 Forbidden`   |
+| 19| Tạo Label trong project                | Editor| `201 Created`     |
+| 20| Danh sách Label trong project          | Any   | `200 OK`          |
+| 21| Cập nhật Label                         | Editor| `200 OK`          |
+| 22| Tạo Task trong project                 | Editor| `201 Created`     |
+| 23| Gán Label cho Task                     | Editor| `200 OK`          |
+| 24| Lọc Task theo status/priority/assignee | Any   | `200 OK`          |
+| 25| Cập nhật Task status/priority          | Editor| `200 OK`          |
+| 26| Viewer tạo Task                        | Viewer| `403 Forbidden`   |
+| 27| Bỏ Label khỏi Task                     | Editor| `204 No Content`  |
+| 28| Xóa Task                               | Editor| `204 No Content`  |
+| 29| Xóa Label                              | Editor| `204 No Content`  |
+
