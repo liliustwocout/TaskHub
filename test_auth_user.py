@@ -1,4 +1,5 @@
 import pytest
+import uuid
 from httpx import AsyncClient, ASGITransport
 from app.main import app
 
@@ -6,20 +7,22 @@ from app.main import app
 @pytest.mark.asyncio
 async def test_auth_and_user_flow():
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+        email = f"user_{uuid.uuid4().hex[:8]}@example.com"
+        
         # 1. Register User
         reg_resp = await ac.post("/api/v1/auth/register", json={
-            "email": "testuser@example.com",
+            "email": email,
             "full_name": "Test User",
             "password": "Password123!"
         })
         assert reg_resp.status_code == 201, reg_resp.text
         user_data = reg_resp.json()
-        assert user_data["email"] == "testuser@example.com"
+        assert user_data["email"] == email
         assert user_data["full_name"] == "Test User"
 
         # 2. Login User
         login_resp = await ac.post("/api/v1/auth/login", json={
-            "email": "testuser@example.com",
+            "email": email,
             "password": "Password123!"
         })
         assert login_resp.status_code == 200, login_resp.text
@@ -32,7 +35,7 @@ async def test_auth_and_user_flow():
         # 3. Get Profile
         me_resp = await ac.get("/api/v1/users/me", headers=headers)
         assert me_resp.status_code == 200
-        assert me_resp.json()["email"] == "testuser@example.com"
+        assert me_resp.json()["email"] == email
 
         # 4. Update Profile
         update_resp = await ac.patch("/api/v1/users/me", json={"full_name": "Updated User"}, headers=headers)
