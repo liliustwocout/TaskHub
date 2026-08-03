@@ -29,8 +29,8 @@ Toàn bộ giai đoạn này xoay quanh việc xây dựng một Sample app duy 
 4. **Project**: CRUD trong workspace, Archive project
 5. **Task**: CRUD trong project, Assign task cho member, Chuyển status, Đặt priority & due_date
 6. **Label**: CRUD (per project), Gán/bỏ label cho task
-7. **Comment**: Thêm/xóa comment trên task
-8. **Filtering & Pagination**: lọc task theo status, priority, assignee; page + limit
+7. **Comment**: Thêm/xóa comment trên task, lấy danh sách comment của task (Owner/Editor/Viewer thuộc workspace)
+8. **Filtering & Pagination**: Lọc task theo status, priority, assignee_id; hỗ trợ phân trang chuẩn với page + limit (trả về items, total, page, limit, total_pages)
 9. **Caching**: Cache GET /projects/{id}/tasks với Redis, invalidate khi có thay đổi
 10. **Background Task**: Gửi email notification khi được assign task
 11. **RBAC**: Phân quyền ADMIN / OWNER / EDITOR / VIEWER đúng theo từng resource

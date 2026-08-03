@@ -1,44 +1,44 @@
-# 🚀 TaskHub — Task Management API
+# TaskHub — Task Management API
 
 **TaskHub** là hệ thống quản lý công việc (Task Management) được xây dựng trên nền tảng **FastAPI**, hỗ trợ làm việc nhóm thông qua Workspace, Project và Task với hệ thống phân quyền RBAC hoàn chỉnh.
 
 ---
 
-## 📋 Mục lục
+## Mục lục
 
-- [Tính năng](#-tính-năng)
-- [Tech Stack](#-tech-stack)
-- [Cấu trúc dự án](#-cấu-trúc-dự-án)
-- [Cài đặt & Chạy](#-cài-đặt--chạy)
-- [Biến môi trường](#-biến-môi-trường)
-- [API Endpoints](#-api-endpoints)
-- [Phân quyền (RBAC)](#-phân-quyền-rbac)
-- [Database Schema](#-database-schema)
-- [Testing](#-testing)
+- [Tính năng](#tính-năng)
+- [Tech Stack](#tech-stack)
+- [Cấu trúc dự án](#cấu-trúc-dự-án)
+- [Cài đặt & Chạy](#cài-đặt--chạy)
+- [Biến môi trường](#biến-môi-trường)
+- [API Endpoints](#api-endpoints)
+- [Phân quyền (RBAC)](#phân-quyền-rbac)
+- [Database Schema](#database-schema)
+- [Testing](#testing)
 
 ---
 
-## ✨ Tính năng
+## Tính năng
 
 | #  | Module        | Mô tả                                                                 | Trạng thái |
 |----|---------------|------------------------------------------------------------------------|:----------:|
-| 1  | **Auth**      | Register, Login (JWT access + refresh token), Logout (revoke token)    | ✅         |
-| 2  | **User**      | Get profile, Update profile (PATCH), Change password                   | ✅         |
-| 3  | **Workspace** | CRUD workspace, Invite/Remove member, Phân quyền theo role             | ✅         |
-| 4  | **Project**   | CRUD trong workspace, Archive project                                  | ✅         |
-| 5  | Task          | CRUD trong project, Assign, Chuyển status, Priority & due_date         | ✅         |
-| 6  | Label         | CRUD per project, Gán/bỏ label cho task                                | ✅         |
-| 7  | Comment       | Thêm/xóa comment trên task                                            | 🔲         |
-| 8  | Filter & Page | Lọc task theo status, priority, assignee; pagination                   | 🔲         |
-| 9  | Caching       | Cache GET tasks với Redis, invalidate khi có thay đổi                  | 🔲         |
-| 10 | Background    | Gửi email notification khi được assign task                            | 🔲         |
-| 11 | RBAC          | Phân quyền ADMIN / OWNER / EDITOR / VIEWER theo resource               | ✅         |
-| 12 | Swagger/ReDoc | Đầy đủ docs, Bearer auth scheme                                       | ✅         |
-| 13 | Docker        | `docker compose up` chạy toàn bộ stack                                 | ✅         |
+| 1  | **Auth**      | Register, Login (JWT access + refresh token), Logout (revoke token)    | Thành công |
+| 2  | **User**      | Get profile, Update profile (PATCH), Change password                   | Thành công |
+| 3  | **Workspace** | CRUD workspace, Invite/Remove member, Phân quyền theo role             | Thành công |
+| 4  | **Project**   | CRUD trong workspace, Archive project                                  | Thành công |
+| 5  | **Task**      | CRUD trong project, Assign, Chuyển status, Priority & due_date         | Thành công |
+| 6  | **Label**     | CRUD per project, Gán/bỏ label cho task                                | Thành công |
+| 7  | **Comment**   | Thêm/xóa comment trên task                                            | Thành công |
+| 8  | **Filter & Page** | Lọc task theo status, priority, assignee; pagination               | Thành công |
+| 9  | **Caching**   | Cache GET tasks với Redis, invalidate khi có thay đổi                  | Chưa làm   |
+| 10 | **Background**| Gửi email notification khi được assign task                            | Chưa làm   |
+| 11 | **RBAC**      | Phân quyền ADMIN / OWNER / EDITOR / VIEWER theo resource               | Thành công |
+| 12 | **Swagger/ReDoc** | Đầy đủ docs, Bearer auth scheme                                   | Thành công |
+| 13 | **Docker**    | `docker compose up` chạy toàn bộ stack                                 | Thành công |
 
 ---
 
-## 🛠 Tech Stack
+## Tech Stack
 
 | Thành phần     | Công nghệ                        |
 |----------------|----------------------------------|
@@ -54,7 +54,7 @@
 
 ---
 
-## 📁 Cấu trúc dự án
+## Cấu trúc dự án
 
 ```
 TaskHub/
@@ -71,7 +71,8 @@ TaskHub/
 │   │   ├── workspace.py           # Workspace + WorkspaceMember models
 │   │   ├── project.py             # Project model (ACTIVE/ARCHIVED)
 │   │   ├── label.py               # Label model
-│   │   └── task.py                # Task model + task_labels
+│   │   ├── task.py                # Task model + task_labels
+│   │   └── comment.py             # Comment model
 │   ├── schemas/
 │   │   ├── __init__.py            # Export all schemas
 │   │   ├── auth.py                # Token, LoginRequest, RefreshTokenRequest
@@ -79,7 +80,8 @@ TaskHub/
 │   │   ├── workspace.py           # WorkspaceCreate/Update/Response, MemberAdd
 │   │   ├── project.py             # ProjectCreate, ProjectUpdate, ProjectResponse
 │   │   ├── label.py               # LabelCreate, LabelUpdate, LabelResponse
-│   │   └── task.py                # TaskCreate, TaskUpdate, TaskResponse
+│   │   ├── task.py                # TaskCreate, TaskUpdate, TaskResponse
+│   │   └── comment.py             # CommentCreate, CommentResponse
 │   └── api/
 │       └── v1/
 │           ├── router.py          # API router aggregation
@@ -90,7 +92,8 @@ TaskHub/
 │               ├── workspaces.py  # Workspace CRUD + Member management
 │               ├── projects.py    # Project CRUD + Archive
 │               ├── labels.py      # Label CRUD
-│               └── tasks.py       # Task CRUD + Filter + Labels
+│               ├── tasks.py       # Task CRUD + Filter + Labels
+│               └── comments.py    # Comment CRUD
 ├── alembic/                       # Database migrations
 ├── alembic.ini
 ├── docker-compose.yml             # PostgreSQL 16 + Redis 7 + App
@@ -101,12 +104,13 @@ TaskHub/
 ├── pytest.ini
 ├── test_auth_user.py              # Auth & User integration tests
 ├── test_workspace_project.py      # Workspace & Project integration tests
-└── test_task_label.py             # Task & Label integration tests
+├── test_task_label.py             # Task & Label integration tests
+└── test_comment_pagination.py     # Comment & Pagination integration tests
 ```
 
 ---
 
-## 🚀 Cài đặt & Chạy
+## Cài đặt & Chạy
 
 ### Cách 1: Docker Compose (Khuyến nghị)
 
@@ -159,7 +163,7 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 
 ---
 
-## 🔐 Biến môi trường
+## Biến môi trường
 
 Tạo file `.env` tại thư mục gốc dự án (tham khảo `.env.example`):
 
@@ -175,28 +179,28 @@ DATABASE_URL=postgresql+asyncpg://postgres:postgres@localhost:5432/taskhub_db
 REDIS_URL=redis://localhost:6379/0
 ```
 
-> ⚠️ **Lưu ý:** Thay đổi `SECRET_KEY` trước khi deploy lên production.
+> **Lưu ý:** Thay đổi `SECRET_KEY` trước khi deploy lên production.
 
 ---
 
-## 📡 API Endpoints
+## API Endpoints
 
 ### Auth (`/api/v1/auth`)
 
 | Method | Endpoint              | Mô tả                          | Auth |
 |--------|-----------------------|---------------------------------|:----:|
-| POST   | `/auth/register`      | Đăng ký tài khoản mới          | ❌   |
-| POST   | `/auth/login`         | Đăng nhập, nhận JWT tokens     | ❌   |
-| POST   | `/auth/refresh`       | Làm mới access token           | ❌   |
-| POST   | `/auth/logout`        | Đăng xuất, revoke refresh token| ❌   |
+| POST   | `/auth/register`      | Đăng ký tài khoản mới          | Không |
+| POST   | `/auth/login`         | Đăng nhập, nhận JWT tokens     | Không |
+| POST   | `/auth/refresh`       | Làm mới access token           | Không |
+| POST   | `/auth/logout`        | Đăng xuất, revoke refresh token| Không |
 
 ### User (`/api/v1/users`)
 
 | Method | Endpoint                  | Mô tả                | Auth |
 |--------|---------------------------|-----------------------|:----:|
-| GET    | `/users/me`               | Xem profile cá nhân  | ✅   |
-| PATCH  | `/users/me`               | Cập nhật profile      | ✅   |
-| POST   | `/users/me/change-password` | Đổi mật khẩu       | ✅   |
+| GET    | `/users/me`               | Xem profile cá nhân  | Có   |
+| PATCH  | `/users/me`               | Cập nhật profile      | Có   |
+| POST   | `/users/me/change-password` | Đổi mật khẩu       | Có   |
 
 ### Workspace (`/api/v1/workspaces`)
 
@@ -242,9 +246,17 @@ REDIS_URL=redis://localhost:6379/0
 | POST   | `/tasks/{id}/labels/{label_id}`       | Gán label cho task                           | OWNER / EDITOR |
 | DELETE | `/tasks/{id}/labels/{label_id}`       | Bỏ label khỏi task                           | OWNER / EDITOR |
 
+### Comment (`/api/v1`)
+
+| Method | Endpoint                              | Mô tả                                       | Quyền          |
+|--------|---------------------------------------|----------------------------------------------|----------------|
+| POST   | `/tasks/{id}/comments`                | Thêm comment vào task                        | Member         |
+| GET    | `/tasks/{id}/comments`                | Xem danh sách comment của task               | Member         |
+| DELETE | `/comments/{id}`                      | Xóa comment                                  | Author / OWNER |
+
 ---
 
-## 🛡 Phân quyền (RBAC)
+## Phân quyền (RBAC)
 
 ### System-level Roles (User)
 
@@ -258,8 +270,8 @@ REDIS_URL=redis://localhost:6379/0
 | Role     | Workspace          | Project            | Member Management  |
 |----------|--------------------|--------------------|-------------------|
 | `OWNER`  | CRUD               | CRUD + Delete      | Invite / Remove   |
-| `EDITOR` | Xem                | Create + Update    | ❌                |
-| `VIEWER` | Xem                | Xem                | ❌                |
+| `EDITOR` | Xem                | Create + Update    | Không có quyền    |
+| `VIEWER` | Xem                | Xem                | Không có quyền    |
 
 **Luồng phân quyền:**
 1. Người tạo Workspace tự động trở thành **OWNER**.
@@ -269,7 +281,7 @@ REDIS_URL=redis://localhost:6379/0
 
 ---
 
-## 🗄 Database Schema
+## Database Schema
 
 ```
 ┌─────────────────────┐       ┌──────────────────────────┐
@@ -335,7 +347,7 @@ REDIS_URL=redis://localhost:6379/0
 
 ---
 
-## 🧪 Testing
+## Testing
 
 Dự án sử dụng **pytest** + **pytest-asyncio** + **httpx** cho integration test.
 
@@ -350,6 +362,7 @@ python -m pytest -v
 python -m pytest test_auth_user.py -v
 python -m pytest test_workspace_project.py -v
 python -m pytest test_task_label.py -v
+python -m pytest test_comment_pagination.py -v
 ```
 
 ### Test Suites hiện có
@@ -359,9 +372,10 @@ python -m pytest test_task_label.py -v
 | `test_auth_user.py`          | Register → Login → Profile → Update → Logout | 7         |
 | `test_workspace_project.py`  | Workspace CRUD, Member mgmt, Project CRUD     | 10        |
 | `test_task_label.py`         | Task & Label CRUD, Assignee, Filter, RBAC     | 15        |
+| `test_comment_pagination.py` | Comment CRUD, Task Filtering & Pagination     | 8         |
 
 ---
 
-## 📄 License
+## License
 
 MIT License — Xem file [LICENSE](LICENSE) để biết thêm chi tiết.

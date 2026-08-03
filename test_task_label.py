@@ -153,15 +153,15 @@ async def test_task_and_label_flow():
         # 12. Filter tasks by status and priority
         filter_status = await ac.get(f"/api/v1/projects/{proj_id}/tasks?status=IN_PROGRESS", headers=headers_viewer)
         assert filter_status.status_code == 200
-        assert len(filter_status.json()) == 2
+        assert len(filter_status.json()["items"]) == 2
 
         filter_priority = await ac.get(f"/api/v1/projects/{proj_id}/tasks?priority=URGENT", headers=headers_viewer)
         assert filter_priority.status_code == 200
-        assert len(filter_priority.json()) == 2
+        assert len(filter_priority.json()["items"]) == 2
 
         filter_assignee = await ac.get(f"/api/v1/projects/{proj_id}/tasks?assignee_id={editor_id}", headers=headers_viewer)
         assert filter_assignee.status_code == 200
-        assert len(filter_assignee.json()) == 1
+        assert len(filter_assignee.json()["items"]) == 1
 
         # 13. Remove Label from Task
         del_lbl_res = await ac.delete(f"/api/v1/tasks/{t1_id}/labels/{lbl1_id}", headers=headers_editor)

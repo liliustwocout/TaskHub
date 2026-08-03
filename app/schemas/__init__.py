@@ -11,6 +11,7 @@ from app.schemas.workspace import (
 from app.schemas.project import ProjectCreate, ProjectUpdate, ProjectResponse
 from app.schemas.label import LabelCreate, LabelUpdate, LabelResponse
 from app.schemas.task import TaskCreate, TaskUpdate, TaskResponse, TaskPaginatedResponse
+from app.schemas.comment import CommentCreate, CommentResponse
 
 __all__ = [
     "UserCreate",
@@ -37,6 +38,8 @@ __all__ = [
     "TaskUpdate",
     "TaskResponse",
     "TaskPaginatedResponse",
+    "CommentCreate",
+    "CommentResponse",
 ]
 
 

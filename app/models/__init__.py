@@ -4,6 +4,7 @@ from app.models.workspace import Workspace, WorkspaceMember, WorkspaceRole
 from app.models.project import Project, ProjectStatus
 from app.models.label import Label
 from app.models.task import Task, TaskStatus, TaskPriority, task_labels
+from app.models.comment import Comment
 
 __all__ = [
     "Base",
@@ -18,6 +19,7 @@ __all__ = [
     "TaskStatus",
     "TaskPriority",
     "task_labels",
+    "Comment",
 ]
 
 
