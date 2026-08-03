@@ -48,3 +48,6 @@ class Task(Base):
     labels: Mapped[list["Label"]] = relationship(
         "Label", secondary=task_labels, back_populates="tasks"
     )
+    comments: Mapped[list["Comment"]] = relationship(
+        "Comment", back_populates="task", cascade="all, delete-orphan"
+    )

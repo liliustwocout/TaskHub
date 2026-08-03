@@ -1,7 +1,7 @@
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, func
 from sqlalchemy.orm import selectinload
 
 from app.core.database import get_db
@@ -11,7 +11,7 @@ from app.models.workspace import WorkspaceMember, WorkspaceRole
 from app.models.project import Project
 from app.models.task import Task, TaskStatus, TaskPriority
 from app.models.label import Label
-from app.schemas.task import TaskCreate, TaskUpdate, TaskResponse
+from app.schemas.task import TaskCreate, TaskUpdate, TaskResponse, TaskPaginatedResponse
 from app.api.v1.endpoints.workspaces import get_user_workspace_role
 
 router = APIRouter()
@@ -71,7 +71,7 @@ async def create_task(
     return res.scalar_one()
 
 
-@router.get("/projects/{project_id}/tasks", response_model=List[TaskResponse])
+@router.get("/projects/{project_id}/tasks", response_model=TaskPaginatedResponse)
 async def list_project_tasks(
     project_id: int,
     status_filter: Optional[TaskStatus] = Query(None, alias="status"),
@@ -105,11 +105,27 @@ async def list_project_tasks(
     if assignee_id is not None:
         stmt = stmt.where(Task.assignee_id == assignee_id)
 
+    # Đếm tổng số lượng bản ghi thỏa điều kiện
+    count_stmt = select(func.count()).select_from(stmt.subquery())
+    total_res = await db.execute(count_stmt)
+    total = total_res.scalar() or 0
+
     offset = (page - 1) * limit
     stmt = stmt.offset(offset).limit(limit)
 
     result = await db.execute(stmt)
-    return result.scalars().all()
+    items = result.scalars().all()
+
+    import math
+    total_pages = math.ceil(total / limit) if total > 0 else 0
+
+    return {
+        "items": items,
+        "total": total,
+        "page": page,
+        "limit": limit,
+        "total_pages": total_pages,
+    }
 
 
 @router.get("/tasks/{task_id}", response_model=TaskResponse)
