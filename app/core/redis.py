@@ -8,7 +8,12 @@ redis_client: Optional[redis.Redis] = None
 async def get_redis() -> redis.Redis:
     global redis_client
     if redis_client is None:
-        redis_client = redis.from_url(settings.REDIS_URL, decode_responses=True)
+        redis_client = redis.from_url(
+            settings.REDIS_URL,
+            decode_responses=True,
+            socket_connect_timeout=2,
+            socket_timeout=2,
+        )
     return redis_client
 
 

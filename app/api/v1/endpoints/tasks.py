@@ -1,10 +1,16 @@
+import json
+import math
+import logging
 from typing import List, Optional
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+
+from fastapi import APIRouter, Depends, HTTPException, status, Query, BackgroundTasks
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 from sqlalchemy.orm import selectinload
 
 from app.core.database import get_db
+from app.core.cache import get_task_cache, set_task_cache, invalidate_task_cache
+from app.core.email import send_task_assignment_email
 from app.api.v1.deps import get_current_user
 from app.models.user import User
 from app.models.workspace import WorkspaceMember, WorkspaceRole
@@ -14,6 +20,8 @@ from app.models.label import Label
 from app.schemas.task import TaskCreate, TaskUpdate, TaskResponse, TaskPaginatedResponse
 from app.api.v1.endpoints.workspaces import get_user_workspace_role
 
+logger = logging.getLogger(__name__)
+
 router = APIRouter()
 
 
@@ -22,10 +30,36 @@ async def validate_workspace_member(db: AsyncSession, workspace_id: int, user_id
     return role is not None
 
 
+async def _get_user_by_id(db: AsyncSession, user_id: int) -> Optional[User]:
+    """Helper to fetch a user by ID."""
+    result = await db.execute(select(User).where(User.id == user_id))
+    return result.scalar_one_or_none()
+
+
+async def _send_assignment_notification(
+    db: AsyncSession,
+    assignee_id: int,
+    task_title: str,
+    project_name: str,
+    assigner_name: str,
+) -> None:
+    """Background task: send email notification for task assignment."""
+    assignee = await _get_user_by_id(db, assignee_id)
+    if assignee:
+        await send_task_assignment_email(
+            to_email=assignee.email,
+            to_name=assignee.full_name,
+            task_title=task_title,
+            project_name=project_name,
+            assigner_name=assigner_name,
+        )
+
+
 @router.post("/projects/{project_id}/tasks", response_model=TaskResponse, status_code=status.HTTP_201_CREATED)
 async def create_task(
     project_id: int,
     data: TaskCreate,
+    background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -64,6 +98,20 @@ async def create_task(
     db.add(task)
     await db.commit()
 
+    # Invalidate cache for this project (Feature 9)
+    await invalidate_task_cache(project_id)
+
+    # Send email notification if task is assigned (Feature 10)
+    if data.assignee_id is not None:
+        background_tasks.add_task(
+            _send_assignment_notification,
+            db,
+            data.assignee_id,
+            data.title,
+            project.name,
+            current_user.full_name,
+        )
+
     # Query back with labels loaded
     res = await db.execute(
         select(Task).options(selectinload(Task.labels)).where(Task.id == task.id)
@@ -96,6 +144,20 @@ async def list_project_tasks(
             detail="You do not have access to this project",
         )
 
+    # Feature 9: Check Redis cache first
+    query_params = {
+        "status": status_filter.value if status_filter else None,
+        "priority": priority_filter.value if priority_filter else None,
+        "assignee_id": assignee_id,
+        "page": page,
+        "limit": limit,
+    }
+
+    cached = await get_task_cache(project_id, query_params)
+    if cached:
+        return json.loads(cached)
+
+    # Cache miss: query database
     stmt = select(Task).options(selectinload(Task.labels)).where(Task.project_id == project_id)
 
     if status_filter is not None:
@@ -116,16 +178,20 @@ async def list_project_tasks(
     result = await db.execute(stmt)
     items = result.scalars().all()
 
-    import math
     total_pages = math.ceil(total / limit) if total > 0 else 0
 
-    return {
-        "items": items,
+    response_data = {
+        "items": [TaskResponse.model_validate(item).model_dump(mode="json") for item in items],
         "total": total,
         "page": page,
         "limit": limit,
         "total_pages": total_pages,
     }
+
+    # Store in cache (Feature 9)
+    await set_task_cache(project_id, query_params, json.dumps(response_data, default=str))
+
+    return response_data
 
 
 @router.get("/tasks/{task_id}", response_model=TaskResponse)
@@ -159,6 +225,7 @@ async def get_task(
 async def update_task(
     task_id: int,
     data: TaskUpdate,
+    background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -179,6 +246,9 @@ async def update_task(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Only OWNER or EDITOR can edit task",
         )
+
+    # Track if assignee changed for email notification (Feature 10)
+    old_assignee_id = task.assignee_id
 
     if data.assignee_id is not None:
         is_member = await validate_workspace_member(db, project.workspace_id, data.assignee_id)
@@ -202,6 +272,21 @@ async def update_task(
 
     await db.commit()
     await db.refresh(task)
+
+    # Invalidate cache for this project (Feature 9)
+    await invalidate_task_cache(task.project_id)
+
+    # Send email notification if assignee changed (Feature 10)
+    if data.assignee_id is not None and data.assignee_id != old_assignee_id:
+        background_tasks.add_task(
+            _send_assignment_notification,
+            db,
+            data.assignee_id,
+            task.title,
+            project.name,
+            current_user.full_name,
+        )
+
     return task
 
 
@@ -228,8 +313,13 @@ async def delete_task(
             detail="Only OWNER or EDITOR can delete task",
         )
 
+    project_id = task.project_id
     await db.delete(task)
     await db.commit()
+
+    # Invalidate cache for this project (Feature 9)
+    await invalidate_task_cache(project_id)
+
     return None
 
 
@@ -276,6 +366,9 @@ async def add_label_to_task(
         await db.commit()
         await db.refresh(task)
 
+        # Invalidate cache for this project (Feature 9)
+        await invalidate_task_cache(task.project_id)
+
     return task
 
 
@@ -314,5 +407,8 @@ async def remove_label_from_task(
     if label in task.labels:
         task.labels.remove(label)
         await db.commit()
+
+        # Invalidate cache for this project (Feature 9)
+        await invalidate_task_cache(task.project_id)
 
     return None

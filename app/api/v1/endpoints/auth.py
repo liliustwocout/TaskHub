@@ -17,6 +17,9 @@ from app.models.user import User
 from app.schemas.user import UserCreate, UserResponse
 from app.schemas.auth import Token, LoginRequest, RefreshTokenRequest
 
+from typing import Optional
+from fastapi.security import OAuth2PasswordRequestForm
+
 router = APIRouter()
 
 
@@ -42,11 +45,23 @@ async def register(user_in: UserCreate, db: AsyncSession = Depends(get_db)):
 
 
 @router.post("/login", response_model=Token)
-async def login(login_in: LoginRequest, db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(User).where(User.email == login_in.email))
+async def login(
+    form_data: OAuth2PasswordRequestForm = Depends(),
+    db: AsyncSession = Depends(get_db)
+):
+    email = form_data.username
+    password = form_data.password
+
+    if not email or not password:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Email and password are required",
+        )
+
+    result = await db.execute(select(User).where(User.email == email))
     user = result.scalars().first()
     
-    if not user or not verify_password(login_in.password, user.hashed_password):
+    if not user or not verify_password(password, user.hashed_password):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect email or password",

@@ -46,14 +46,9 @@ Gọi lại **POST `/api/v1/auth/register`** với cùng email `user1@test.com`.
 
 ### Test 1.3: Đăng nhập (Login) - Thành công
 
-Mở **POST `/api/v1/auth/login`** → nhập:
-
-```json
-{
-  "email": "user1@test.com",
-  "password": "Password123!"
-}
-```
+Mở **POST `/api/v1/auth/login`** → **Try it out** → nhập (hoặc dùng nút Authorize ở góc phải):
+- `username`: `user1@test.com`
+- `password`: `Password123!`
 
 → Kỳ vọng: `200 OK`
 ```json
